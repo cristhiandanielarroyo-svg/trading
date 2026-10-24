@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradingView PRO Simulator - Multi-Timeframe & Killzones</title>
+    <!-- Lightweight Charts v4 -->
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <!-- PapaParse CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #131722;
+            color: #d1d4dc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header Navigation Bar */
+        .navbar {
+            background-color: #1e222d;
+            border-bottom: 1px solid #2a2e39;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            z-index: 20;
+            height: 48px;
+        }
+
+        .nav-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand {
+            font-weight: 700;
+            color: #2962ff;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-right: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Buttons and Inputs */
+        .file-upload-btn {
+            position: relative;
+            display: inline-block;
+        }
+        .file-upload-btn input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .btn {
+            background: #2a2e39;
+            color: #d1d4dc;
+            border: 1px solid #363a45;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            height: 32px;
+        }
+        .btn:hover:not(:disabled) {
+            background: #363a45;
+            color: #ffffff;
+            border-color: #4f5462;
+        }
+        .btn-primary {
+            background: #2962ff;
+            color: #ffffff;
+            border-color: #2962ff;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: #1e53e5;
+        }
+        .btn-active {
+            background: #2962ff !important;
+            color: #ffffff !important;
+            border-color: #2962ff !important;
+        }
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        select {
+            background: #2a2e39;
+            color: #d1d4dc;
+            border: 1px solid #363a45;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            outline: none;
+            height: 32px;
+        }
+        select:focus {
+            border-color: #2962ff;
+        }
+
+        /* Replay Player Toolbar */
+        .replay-bar {
+            background: #181c27;
+            border-bottom: 1px solid #2a2e39;
+            padding: 4px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            font-size: 12px;
+            height: 40px;
+        }
+
+        .timeline-slider {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 500px;
+        }
+        .timeline-slider input[type="range"] {
+            width: 100%;
+            height: 4px;
+            background: #2a2e39;
+            border-radius: 2px;
+            outline: none;
+            accent-color: #2962ff;
+            cursor: pointer;
+        }
+
+        .status-badge {
+            background: #2a2e39;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #787b86;
+            white-space: nowrap;
+        }
+        .status-badge span {
+            color: #2962ff;
+            font-weight: 600;
+        }
+
+        /* Dropdown Menu for Killzones */
+        .dropdown-menu {
+            position: relative;
+        }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background-color: #1e222d;
+            min-width: 280px;
+            box-shadow: 0px 8px 24px rgba(0,0,0,0.6);
+            border: 1px solid #2a2e39;
+            border-radius: 6px;
+            padding: 14px;
+            z-index: 100;
+            margin-top: 6px;
+        }
+        .dropdown-menu.active .dropdown-content {
+            display: block;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .checkbox-group:last-child {
+            margin-bottom: 0;
+        }
+        .checkbox-group input {
+            cursor: pointer;
+            accent-color: #2962ff;
+            width: 15px;
+            height: 15px;
+        }
+        .color-badge {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+
+        /* Chart Workspace / Split View */
+        #workspace {
+            flex: 1;
+            display: flex;
+            width: 100%;
+            height: calc(100vh - 88px);
+            position: relative;
+            background-color: #131722;
+        }
+
+        .chart-container {
+            flex: 1;
+            height: 100%;
+            position: relative;
+            border-right: 1px solid #2a2e39;
+            display: flex;
+            flex-direction: column;
+        }
+        .chart-container:last-child {
+            border-right: none;
+        }
+
+        .chart-header {
+            position: absolute;
+            top: 10px;
+            left: 12px;
+            z-index: 10;
+            background: rgba(30, 34, 45, 0.85);
+            backdrop-filter: blur(6px);
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(42, 46, 57, 0.8);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: auto;
+        }
+        .timeframe-tag {
+            font-weight: 700;
+            color: #2962ff;
+            background: rgba(41, 98, 255, 0.15);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .ohlc-info {
+            display: flex;
+            gap: 8px;
+            font-size: 11px;
+        }
+        .ohlc-info span label {
+            color: #787b86;
+        }
+
+        .chart-box {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Layout Switcher Buttons */
+        .layout-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        /* Custom Box Highlights SVG Overlay */
+        .box-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navbar -->
+    <div class="navbar">
+        <div class="nav-group">
+            <div class="brand">
+                <i class="fa-solid fa-chart-line"></i> TRADINGVIEW SIMULATOR
+            </div>
+            
+            <div class="file-upload-btn">
+                <button class="btn btn-primary"><i class="fa-solid fa-folder-open"></i> Cargar CSV MT5</button>
+                <input type="file" id="csvFileInput" accept=".csv, .txt">
+            </div>
+
+            <span id="fileNameDisplay" style="font-size: 12px; color: #787b86;">Sin archivo cargado</span>
+        </div>
+
+        <!-- Indicadores & Layout Switcher -->
+        <div class="nav-group">
+            <!-- Selector de Layout -->
+            <div style="display: flex; gap: 2px; background: #2a2e39; padding: 2px; border-radius: 4px;">
+                <button class="btn layout-btn btn-active" id="btnSingleView" title="Vista Única"><i class="fa-solid fa-square"></i></button>
+                <button class="btn layout-btn" id="btnSplitView" title="Vista Dividida (4H / 15M)"><i class="fa-solid fa-columns"></i></button>
+            </div>
+
+            <!-- Menú Killzones -->
+            <div class="dropdown-menu" id="killzoneDropdown">
+                <button class="btn" onclick="toggleDropdown()"><i class="fa-solid fa-layer-group"></i> Sesiones / Killzones <i class="fa-solid fa-chevron-down" style="font-size: 10px;"></i></button>
+                <div class="dropdown-content">
+                    <div style="font-weight: 700; margin-bottom: 12px; font-size: 11px; color: #787b86; letter-spacing: 0.5px;">ICT KILLZONES & CAJAS (UTC-5 EST)</div>
+                    
+                    <label class="checkbox-group">
+                        <input type="checkbox" id="chkAsia" checked onchange="renderKillzones()">
+                        <span class="color-badge" style="background: rgba(255, 152, 0, 0.8);"></span>
+                        <span>Asia Session (20:00 - 00:00)</span>
+                    </label>
+                    <label class="checkbox-group">
+                        <input type="checkbox" id="chkLondon" checked onchange="renderKillzones()">
+                        <span class="color-badge" style="background: rgba(33, 150, 243, 0.8);"></span>
+                        <span>London KZ (02:00 - 05:00)</span>
+                    </label>
+                    <label class="checkbox-group">
+                        <input type="checkbox" id="chkNY" checked onchange="renderKillzones()">
+                        <span class="color-badge" style="background: rgba(76, 175, 80, 0.8);"></span>
+                        <span>New York KZ (07:00 - 10:00)</span>
+                    </label>
+                    <label class="checkbox-group">
+                        <input type="checkbox" id="chkLondonClose" checked onchange="renderKillzones()">
+                        <span class="color-badge" style="background: rgba(156, 39, 176, 0.8);"></span>
+                        <span>London Close (10:00 - 12:00)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Replay Controller Bar -->
+    <div class="replay-bar">
+        <div class="nav-group">
+            <button class="btn btn-primary" id="btnPlayPause" disabled><i class="fa-solid fa-play" id="playIcon"></i> <span id="playText">Play</span></button>
+            <button class="btn" id="btnStep" disabled><i class="fa-solid fa-forward-step"></i> +1 Vela</button>
+            
+            <span style="color: #787b86; margin-left: 8px;">Velocidad:</span>
+            <select id="speedSelect" onchange="updateSpeed()">
+                <option value="2000">2.0s / vela</option>
+                <option value="1000">1.0s / vela</option>
+                <option value="500" selected>0.5s / vela</option>
+                <option value="250">0.25s / vela</option>
+                <option value="100">0.1s / vela</option>
+            </select>
+        </div>
+
+        <div class="timeline-slider">
+            <span style="color: #787b86;">Avance:</span>
+            <input type="range" id="replaySlider" min="0" max="100" value="0" disabled>
+        </div>
+
+        <div class="status-badge" id="statusBadge">
+            Vela M15: <span id="currentCandleIndex">0</span> / <span id="totalCandlesCount">0</span>
+        </div>
+    </div>
+
+    <!-- Workspace Multiventana -->
+    <div id="workspace">
+        <!-- Gráfico 1: HTF (4H / Principal) -->
+        <div class="chart-container" id="containerHTF" style="display: none;">
+            <div class="chart-header">
+                <span class="timeframe-tag">4 HORA (HTF)</span>
+                <div class="ohlc-info" id="ohlcHTF">
+                    <span><label>O:</label> <strong id="oHTF">-</strong></span>
+                    <span><label>H:</label> <strong id="hHTF">-</strong></span>
+                    <span><label>L:</label> <strong id="lHTF">-</strong></span>
+                    <span><label>C:</label> <strong id="cHTF">-</strong></span>
+                </div>
+            </div>
+            <div class="chart-box" id="chartHTF"></div>
+            <svg class="box-overlay" id="svgHTF"></svg>
+        </div>
+
+        <!-- Gráfico 2: LTF (15M / Principal) -->
+        <div class="chart-container" id="containerLTF">
+            <div class="chart-header">
+                <span class="timeframe-tag" style="color: #26a69a; background: rgba(38, 166, 154, 0.15);">15 MIN (LTF)</span>
+                <div class="ohlc-info" id="ohlcLTF">
+                    <span><label>O:</label> <strong id="oLTF">-</strong></span>
+                    <span><label>H:</label> <strong id="hLTF">-</strong></span>
+                    <span><label>L:</label> <strong id="lLTF">-</strong></span>
+                    <span><label>C:</label> <strong id="cLTF">-</strong></span>
+                </div>
+            </div>
+            <div class="chart-box" id="chartLTF"></div>
+            <svg class="box-overlay" id="svgLTF"></svg>
+        </div>
+    </div>
+
+    <script>
+        // ESTADO GLOBAL DE LA APLICACIÓN
+        let chartLTF, seriesLTF;
+        let chartHTF, seriesHTF;
+        
+        let rawCandlesLTF = [];  // Datos M15
+        let rawCandlesHTF = [];  // Datos H4 Agregados
+        
+        let currentIndexLTF = 0;
+        let isPlaying = false;
+        let playTimer = null;
+        let playbackSpeed = 500; // ms por vela
+
+        let isSplitView = false;
+
+        // Configuración de Sesiones ICT / Killzones
+        const KILLZONES_DEF = [
+            { id: 'chkAsia', name: 'Asia', startH: 20, endH: 24, color: 'rgba(255, 152, 0, 0.15)', border: 'rgba(255, 152, 0, 0.8)' },
+            { id: 'chkLondon', name: 'London KZ', startH: 2, endH: 5, color: 'rgba(33, 150, 243, 0.15)', border: 'rgba(33, 150, 243, 0.8)' },
+            { id: 'chkNY', name: 'NY Open KZ', startH: 7, endH: 10, color: 'rgba(76, 175, 80, 0.15)', border: 'rgba(76, 175, 80, 0.8)' },
+            { id: 'chkLondonClose', name: 'London Close', startH: 10, endH: 12, color: 'rgba(156, 39, 176, 0.15)', border: 'rgba(156, 39, 176, 0.8)' }
+        ];
+
+        // INICIALIZACIÓN DE LOS GRÁFICOS
+        function initCharts() {
+            const config = {
+                layout: {
+                    background: { color: '#131722' },
+                    textColor: '#d1d4dc',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, Roboto, sans-serif'
+                },
+                grid: {
+                    vertLines: { color: '#1f2431' },
+                    horzLines: { color: '#1f2431' },
+                },
+                crosshair: {
+                    mode: LightweightCharts.CrosshairMode.Normal,
+                },
+                rightPriceScale: {
+                    borderColor: '#2a2e39',
+                    scaleMargins: { top: 0.1, bottom: 0.1 }
+                },
+                timeScale: {
+                    borderColor: '#2a2e39',
+                    timeVisible: true,
+                    secondsVisible: false,
+                },
+            };
+
+            // Gráfico LTF (15M)
+            const elemLTF = document.getElementById('chartLTF');
+            chartLTF = LightweightCharts.createChart(elemLTF, config);
+            seriesLTF = chartLTF.addCandlestickSeries({
+                upColor: '#26a69a', downColor: '#ef5350',
+                borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350'
+            });
+
+            // Gráfico HTF (4H)
+            const elemHTF = document.getElementById('chartHTF');
+            chartHTF = LightweightCharts.createChart(elemHTF, config);
+            seriesHTF = chartHTF.addCandlestickSeries({
+                upColor: '#26a69a', downColor: '#ef5350',
+                borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350'
+            });
+
+            // Redimensionamiento Responsivo
+            window.addEventListener('resize', resizeCharts);
+
+            // Redibujar cajas al mover o hacer zoom en el gráfico
+            chartLTF.timeScale().subscribeVisibleTimeRangeChange(() => renderKillzoneBoxes());
+            chartHTF.timeScale().subscribeVisibleTimeRangeChange(() => renderKillzoneBoxes());
+        }
+
+        function resizeCharts() {
+            if (chartLTF && document.getElementById('chartLTF').clientWidth) {
+                chartLTF.resize(document.getElementById('chartLTF').clientWidth, document.getElementById('chartLTF').clientHeight);
+            }
+            if (chartHTF && document.getElementById('chartHTF').clientWidth) {
+                chartHTF.resize(document.getElementById('chartHTF').clientWidth, document.getElementById('chartHTF').clientHeight);
+            }
+            renderKillzoneBoxes();
+        }
+
+        // CONTROL DEL DESPLEGABLE
+        function toggleDropdown() {
+            document.getElementById('killzoneDropdown').classList.toggle('active');
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.closest('#killzoneDropdown')) {
+                document.getElementById('killzoneDropdown').classList.remove('active');
+            }
+        };
+
+        // PARSER Y CARGA DE DATOS MT5
+        document.getElementById('csvFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('fileNameDisplay').innerText = file.name;
+
+            Papa.parse(file, {
+                skipEmptyLines: true,
+                complete: function(results) {
+                    processMT5CSV(results.data);
+                }
+            });
+        });
+
+        function processMT5CSV(rows) {
+            rawCandlesLTF = [];
+            
+            rows.forEach(row => {
+                if (row.length >= 6) {
+                    let dateStr = String(row[0]).trim().replace(/\./g, '-');
+                    let timeStr = String(row[1]).trim();
+                    let timestamp = `${dateStr} ${timeStr}`;
+                    let dateObj = new Date(timestamp.replace(/-/g, '/'));
+
+                    if (!isNaN(dateObj.getTime())) {
+                        let open = parseFloat(row[2]);
+                        let high = parseFloat(row[3]);
+                        let low = parseFloat(row[4]);
+                        let close = parseFloat(row[5]);
+
+                        if (!isNaN(open) && !isNaN(close)) {
+                            // Convertir a UNIX Timestamp en segundos
+                            let timeSec = Math.floor(dateObj.getTime() / 1000) - (dateObj.getTimezoneOffset() * 60);
+
+                            rawCandlesLTF.push({
+                                time: timeSec,
+                                open: open,
+                                high: high,
+                                low: low,
+                                close: close,
+                                rawDate: dateObj
+                            });
+                        }
+                    }
+                }
+            });
+
+            // Ordenar cronológicamente
+            rawCandlesLTF.sort((a, b) => a.time - b.time);
+
+            if (rawCandlesLTF.length > 0) {
+                // Generar Velas HTF (4 Horas = 14400s)
+                rawCandlesHTF = aggregateHTFCandles(rawCandlesLTF, 14400);
+
+                // Resetear estado
+                currentIndexLTF = Math.min(80, rawCandlesLTF.length);
+                
+                const slider = document.getElementById('replaySlider');
+                slider.max = rawCandlesLTF.length - 1;
+                slider.value = currentIndexLTF;
+                slider.disabled = false;
+
+                document.getElementById('btnPlayPause').disabled = false;
+                document.getElementById('btnStep').disabled = false;
+                document.getElementById('totalCandlesCount').innerText = rawCandlesLTF.length;
+
+                updateSimulationView();
+            } else {
+                alert('No se pudieron procesar datos del archivo CSV de MT5.');
+            }
+        }
+
+        // Agregación de Velas M15 a HTF (4 Horas)
+        function aggregateHTFCandles(candlesLTF, intervalSeconds) {
+            let htfMap = new Map();
+
+            candlesLTF.forEach(c => {
+                let htfTime = Math.floor(c.time / intervalSeconds) * intervalSeconds;
+                if (!htfMap.has(htfTime)) {
+                    htfMap.set(htfTime, {
+                        time: htfTime,
+                        open: c.open,
+                        high: c.high,
+                        low: c.low,
+                        close: c.close,
+                        rawDate: c.rawDate
+                    });
+                } else {
+                    let htfCandle = htfMap.get(htfTime);
+                    htfCandle.high = Math.max(htfCandle.high, c.high);
+                    htfCandle.low = Math.min(htfCandle.low, c.low);
+                    htfCandle.close = c.close;
+                }
+            });
+
+            return Array.from(htfMap.values()).sort((a, b) => a.time - b.time);
+        }
+
+        // ACTUALIZACIÓN SINCRO DE LA VISTA
+        function updateSimulationView() {
+            if (rawCandlesLTF.length === 0) return;
+
+            // Velas M15 visibles
+            const visibleLTF = rawCandlesLTF.slice(0, currentIndexLTF);
+            seriesLTF.setData(visibleLTF);
+
+            // Obtener el tiempo actual del Replay
+            const currentLTFCandle = visibleLTF[visibleLTF.length - 1];
+            const currentTimestamp = currentLTFCandle.time;
+
+            // Filtrar y actualizar velas HTF acumuladas hasta el tiempo actual
+            const visibleHTF = rawCandlesHTF.filter(h => h.time <= currentTimestamp);
+            seriesHTF.setData(visibleHTF);
+
+            // Actualizar etiquetas OHLC
+            updateOHLCTags('LTF', currentLTFCandle);
+            if (visibleHTF.length > 0) {
+                updateOHLCTags('HTF', visibleHTF[visibleHTF.length - 1]);
+            }
+
+            // Actualizar Slider y Contadores
+            document.getElementById('currentCandleIndex').innerText = currentIndexLTF;
+            document.getElementById('replaySlider').value = currentIndexLTF;
+
+            // Auto-scroll
+            chartLTF.timeScale().scrollToRealTime();
+            chartHTF.timeScale().scrollToRealTime();
+
+            // Renderizar cajas de Killzones
+            setTimeout(renderKillzoneBoxes, 30);
+        }
+
+        function updateOHLCTags(prefix, candle) {
+            document.getElementById(`o${prefix}`).innerText = candle.open.toFixed(5);
+            document.getElementById(`h${prefix}`).innerText = candle.high.toFixed(5);
+            document.getElementById(`l${prefix}`).innerText = candle.low.toFixed(5);
+            document.getElementById(`c${prefix}`).innerText = candle.close.toFixed(5);
+        }
+
+        // RENDERIZADO DE CAJAS/RECTÁNGULOS DE KILLZONES (SMC/ICT)
+        function renderKillzoneBoxes() {
+            // Solo renderizar Killzones en el gráfico de 15M (LTF)
+            renderBoxesForChart(chartLTF, seriesLTF, 'svgLTF');
+            
+            // Limpiar el overlay SVG de HTF para que el gráfico de 4H permanezca limpio
+            const svgHTF = document.getElementById('svgHTF');
+            if (svgHTF) {
+                svgHTF.innerHTML = '';
+            }
+        }
+
+        function renderBoxesForChart(chartObj, seriesObj, svgId) {
+            const svg = document.getElementById(svgId);
+            svg.innerHTML = ''; // Limpiar previo
+
+            if (rawCandlesLTF.length === 0) return;
+
+            const timeScale = chartObj.timeScale();
+            const visibleLTF = rawCandlesLTF.slice(0, currentIndexLTF);
+
+            // Agrupar velas por días y detectar Killzones
+            let sessionGroups = [];
+
+            KILLZONES_DEF.forEach(kz => {
+                if (!document.getElementById(kz.id).checked) return;
+
+                let currentSession = null;
+
+                visibleLTF.forEach(c => {
+                    const hours = c.rawDate.getUTCHours();
+
+                    if (hours >= kz.startH && hours < kz.endH) {
+                        if (!currentSession) {
+                            currentSession = {
+                                kz: kz,
+                                startTime: c.time,
+                                endTime: c.time,
+                                high: c.high,
+                                low: c.low
+                            };
+                            sessionGroups.push(currentSession);
+                        } else {
+                            currentSession.endTime = c.time;
+                            currentSession.high = Math.max(currentSession.high, c.high);
+                            currentSession.low = Math.min(currentSession.low, c.low);
+                        }
+                    } else {
+                        currentSession = null;
+                    }
+                });
+            });
+
+            // Dibujar rectángulos en la capa SVG
+            sessionGroups.forEach(s => {
+                const x1 = timeScale.timeToCoordinate(s.startTime);
+                const x2 = timeScale.timeToCoordinate(s.endTime);
+                const y1 = seriesObj.priceToCoordinate(s.high);
+                const y2 = seriesObj.priceToCoordinate(s.low);
+
+                if (x1 !== null && x2 !== null && y1 !== null && y2 !== null) {
+                    const width = Math.max(x2 - x1, 15);
+                    const height = Math.max(y2 - y1, 10);
+
+                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('x', x1 - 5);
+                    rect.setAttribute('y', y1);
+                    rect.setAttribute('width', width + 10);
+                    rect.setAttribute('height', height);
+                    rect.setAttribute('fill', s.kz.color);
+                    rect.setAttribute('stroke', s.kz.border);
+                    rect.setAttribute('stroke-width', '1.5');
+                    rect.setAttribute('rx', '4');
+
+                    // Etiqueta del nombre de la Sesión
+                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    text.setAttribute('x', x1 - 2);
+                    text.setAttribute('y', y1 - 4);
+                    text.setAttribute('fill', s.kz.border);
+                    text.setAttribute('font-size', '10px');
+                    text.setAttribute('font-weight', 'bold');
+                    text.textContent = s.kz.name;
+
+                    svg.appendChild(rect);
+                    svg.appendChild(text);
+                }
+            });
+        }
+
+        // MOTOR DE REPLAY (PLAY / PAUSA CORREGIDO)
+        const btnPlayPause = document.getElementById('btnPlayPause');
+        const playIcon = document.getElementById('playIcon');
+        const playText = document.getElementById('playText');
+
+        btnPlayPause.addEventListener('click', togglePlayPause);
+        document.getElementById('btnStep').addEventListener('click', stepForward);
+
+        function togglePlayPause() {
+            if (isPlaying) {
+                pauseReplay();
+            } else {
+                startReplay();
+            }
+        }
+
+        function startReplay() {
+            if (rawCandlesLTF.length === 0) return;
+            isPlaying = true;
+            playIcon.className = 'fa-solid fa-pause';
+            playText.innerText = 'Pausa';
+            btnPlayPause.classList.add('btn-active');
+
+            playTimer = setInterval(() => {
+                if (currentIndexLTF < rawCandlesLTF.length) {
+                    currentIndexLTF++;
+                    updateSimulationView();
+                } else {
+                    pauseReplay();
+                }
+            }, playbackSpeed);
+        }
+
+        function pauseReplay() {
+            isPlaying = false;
+            clearInterval(playTimer);
+            playIcon.className = 'fa-solid fa-play';
+            playText.innerText = 'Play';
+            btnPlayPause.classList.remove('btn-active');
+        }
+
+        function stepForward() {
+            if (currentIndexLTF < rawCandlesLTF.length) {
+                currentIndexLTF++;
+                updateSimulationView();
+            }
+        }
+
+        function updateSpeed() {
+            playbackSpeed = parseInt(document.getElementById('speedSelect').value);
+            if (isPlaying) {
+                pauseReplay();
+                startReplay();
+            }
+        }
+
+        document.getElementById('replaySlider').addEventListener('input', function(e) {
+            currentIndexLTF = parseInt(e.target.value);
+            updateSimulationView();
+        });
+
+        // CONTROL DE LAYOUT (MULTIVENTANA)
+        document.getElementById('btnSingleView').addEventListener('click', () => {
+            isSplitView = false;
+            document.getElementById('containerHTF').style.display = 'none';
+            document.getElementById('btnSingleView').classList.add('btn-active');
+            document.getElementById('btnSplitView').classList.remove('btn-active');
+            resizeCharts();
+        });
+
+        document.getElementById('btnSplitView').addEventListener('click', () => {
+            isSplitView = true;
+            document.getElementById('containerHTF').style.display = 'flex';
+            document.getElementById('btnSplitView').classList.add('btn-active');
+            document.getElementById('btnSingleView').classList.remove('btn-active');
+            resizeCharts();
+            updateSimulationView();
+        });
+
+        function renderKillzones() {
+            renderKillzoneBoxes();
+        }
+
+        // INICIALIZACIÓN GENERAL
+        window.onload = function() {
+            initCharts();
+        };
+    </script>
+</body>
+</html>
